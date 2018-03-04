@@ -50,3 +50,21 @@ variable "tags" {
     environment = "lab"
   }
 }
+
+
+## related to DSC
+
+variable "dsc_key" {
+}
+
+variable "dsc_endpoint" {
+}
+
+variable dsc_config {
+  default = ""
+}
+variable dsc_mode {
+  default = "applyAndMonitor"
+}
+
+

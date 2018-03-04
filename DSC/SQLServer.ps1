@@ -4,11 +4,16 @@
         SQL Server setup is run using the SYSTEM account. Even if SetupCredential is provided
         it is not used to install SQL Server at this time (see issue #139).
 #>
-Configuration Example
+Configuration SQLServer
 {
     [CmdletBinding()]
     param
     (
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullorEmpty()]
+        [System.Management.Automation.PSCredential]     
+        $storageCredentials,
+
         [Parameter(Mandatory = $true)]
         [ValidateNotNullorEmpty()]
         [System.Management.Automation.PSCredential]
@@ -34,12 +39,40 @@ Configuration Example
 
     node localhost
     {
+    
         #region Install prerequisites for SQL Server
+
+        # fetch Windows SXS files required by .Net 3.5 install
+        # fetch these from the ISO of the Windows Server version (\source\sxs\)
+        # place on an accessible storage location (blob storage used below)
+        $dotNetSXSfolder = "C:\Installs\dotNetsxs"
+        
+        # TODO  parameterise this
+        $storageAccount  = "kewalakasqlvms"
+
+        File dotNetSXSFolder
+        {
+            Type            = "directory"
+            DestinationPath = $dotNetSXSfolder
+            Ensure          = "Present"
+        }
+
+        File DotNet351SXS
+        {
+            Credential      = $storageCredentials
+            SourcePath      = "\\$storageAccount\.file.core.windows.net\Microsoft\dotNet\3.5\SXS\2016\microsoft-windows-netfx3-ondemand-package.cab"
+            DestinationPath = "$dotNetSXSfolder"
+            Type            = "File"
+            DependsOn       = "[File]dotNetSXSFolder"
+        }
+
+        # .Net frameworks required
         WindowsFeature 'NetFramework35'
         {
-            Name   = 'NET-Framework-Core'
-            Source = '\\fileserver.company.local\images$\Win2k12R2\Sources\Sxs' # Assumes built-in Everyone has read permission to the share and path.
-            Ensure = 'Present'
+            Ensure    = "Present"
+            Name      = "NET-Framework-Core"
+            Source    = $dotNetSXSfolder
+            DependsOn = "[File]DotNet351SXS"
         }
 
         WindowsFeature 'NetFramework45'
@@ -57,9 +90,7 @@ Configuration Example
             SQLCollation         = 'SQL_Latin1_General_CP1_CI_AS'
             SQLSvcAccount        = $SqlServiceCredential
             AgtSvcAccount        = $SqlAgentServiceCredential
-            ASSvcAccount         = $SqlServiceCredential
             SQLSysAdminAccounts  = 'COMPANY\SQL Administrators', $SqlAdministratorCredential.UserName
-            ASSysAdminAccounts   = 'COMPANY\SQL Administrators', $SqlAdministratorCredential.UserName
             InstallSharedDir     = 'C:\Program Files\Microsoft SQL Server'
             InstallSharedWOWDir  = 'C:\Program Files (x86)\Microsoft SQL Server'
             InstanceDir          = 'C:\Program Files\Microsoft SQL Server'

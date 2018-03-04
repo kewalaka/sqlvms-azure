@@ -63,9 +63,9 @@ param (
 }
 
 # add modules
-New-AutomationModule -moduleName 'sqlserverdsc' -moduleURI 'https://devopsgallerystorage.blob.core.windows.net/packages/sqlserverdsc.11.0.0.nupkg' 
+New-AutomationModule -moduleName 'SQLServerDSC' -moduleURI 'https://devopsgallerystorage.blob.core.windows.net/packages/sqlserverdsc.11.0.0.nupkg' 
 
 New-AutomationCredentials -name "domainAdminCred" -username "kewalaka\stu"
-New-AutomationCredentials -name "storageAccount" -username "stulab"
+New-AutomationCredentials -name "storageAccount" -username "kewalakasqlvms"
 New-AutomationCredentials -name "SQL engine service account" -username "kewalaka\svc_sqlengine"
 New-AutomationCredentials -name "SQL agent service account" -username "kewalaka\svc_sqlagent"

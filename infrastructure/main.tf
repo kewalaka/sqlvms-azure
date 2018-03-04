@@ -138,6 +138,24 @@ module "win10vm" {
   )}"    
 }
 
+# an AD Domain Controller
+module "addc" {
+  source              = "github.com/Azure/terraform-azurerm-compute?ref=v1.1.5"
+  resource_group_name = "${azurerm_resource_group.rg.name}"
+  location            = "${azurerm_resource_group.rg.location}"
+  vm_hostname         = "addc"
+  vm_os_simple        = "WindowsServer"
+  admin_password      = "${var.admin_password}"
+  nb_public_ip        = "0"
+  vm_size             = "Standard_DS1_v2"
+  vnet_subnet_id      = "${module.operationalvnet.vnet_subnets[2]}"
+  tags                = "${merge(
+    local.common_tags,
+    var.tags,
+    map("role", "AD domain controller")
+  )}"    
+}
+
 # a SQL VM
 
 module "sqlserver1" {
@@ -155,4 +173,94 @@ module "sqlserver1" {
     var.tags,
     map("role", "sql server engine")
   )}"    
+}
+
+# based on https://medium.com/modern-stack/bootstrap-a-vm-to-azure-automation-dsc-using-terraform-f2ba41d25cd2
+resource "azurerm_virtual_machine_extension" "dsc" {
+  name                 = "DevOpsDSC"
+  location             = "${azurerm_resource_group.rg.location}"
+  resource_group_name  = "${azurerm_resource_group.rg.name}"
+  virtual_machine_name = "sqlserver10"
+  publisher            = "Microsoft.Powershell"
+  type                 = "DSC"
+  type_handler_version = "2.74"
+  depends_on           = ["module.sqlserver1"]
+
+  settings = <<SETTINGS
+        {
+            "WmfVersion": "latest",
+            "ModulesUrl": "https://eus2oaasibizamarketprod1.blob.core.windows.net/automationdscpreview/RegistrationMetaConfigV2.zip",
+            "ConfigurationFunction": "RegistrationMetaConfigV2.ps1\\RegistrationMetaConfigV2",
+            "Privacy": {
+                "DataCollection": ""
+            },
+            "Properties": {
+                "RegistrationKey": {
+                  "UserName": "PLACEHOLDER_DONOTUSE",
+                  "Password": "PrivateSettingsRef:registrationKeyPrivate"
+                },
+                "RegistrationUrl": "${var.dsc_endpoint}",
+                "NodeConfigurationName": "${var.dsc_config}",
+                "ConfigurationMode": "${var.dsc_mode}",
+                "ConfigurationModeFrequencyMins": 15,
+                "RefreshFrequencyMins": 30,
+                "RebootNodeIfNeeded": false,
+                "ActionAfterReboot": "continueConfiguration",
+                "AllowModuleOverwrite": false
+            }
+        }
+    SETTINGS
+
+  protected_settings = <<PROTECTED_SETTINGS
+    {
+      "Items": {
+        "registrationKeyPrivate" : "${var.dsc_key}"
+      }
+    }
+PROTECTED_SETTINGS
+}
+
+# based on https://medium.com/modern-stack/bootstrap-a-vm-to-azure-automation-dsc-using-terraform-f2ba41d25cd2
+resource "azurerm_virtual_machine_extension" "dsc-ad" {
+  name                 = "DevOpsDSC"
+  location             = "${azurerm_resource_group.rg.location}"
+  resource_group_name  = "${azurerm_resource_group.rg.name}"
+  virtual_machine_name = "addc0"
+  publisher            = "Microsoft.Powershell"
+  type                 = "DSC"
+  type_handler_version = "2.74"
+  depends_on           = ["module.addc"]
+
+  settings = <<SETTINGS
+        {
+            "WmfVersion": "latest",
+            "ModulesUrl": "https://eus2oaasibizamarketprod1.blob.core.windows.net/automationdscpreview/RegistrationMetaConfigV2.zip",
+            "ConfigurationFunction": "RegistrationMetaConfigV2.ps1\\RegistrationMetaConfigV2",
+            "Privacy": {
+                "DataCollection": ""
+            },
+            "Properties": {
+                "RegistrationKey": {
+                  "UserName": "PLACEHOLDER_DONOTUSE",
+                  "Password": "PrivateSettingsRef:registrationKeyPrivate"
+                },
+                "RegistrationUrl": "${var.dsc_endpoint}",
+                "NodeConfigurationName": "${var.dsc_config}",
+                "ConfigurationMode": "${var.dsc_mode}",
+                "ConfigurationModeFrequencyMins": 15,
+                "RefreshFrequencyMins": 30,
+                "RebootNodeIfNeeded": false,
+                "ActionAfterReboot": "continueConfiguration",
+                "AllowModuleOverwrite": false
+            }
+        }
+    SETTINGS
+
+  protected_settings = <<PROTECTED_SETTINGS
+    {
+      "Items": {
+        "registrationKeyPrivate" : "${var.dsc_key}"
+      }
+    }
+PROTECTED_SETTINGS
 }
