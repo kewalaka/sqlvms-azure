@@ -72,10 +72,12 @@ $azureAccount = Login-AzureRmAccount -Credential $AzureCred #-SubscriptionName '
 #>
 
 # use this hack for live accounts
-if ((Get-AzureRmSubscription) -eq $null)
-{
+try {
+    Get-AzureRmSubscription | Out-Null
     # Add-AzureRmAccount will pop up a window and ask you to authenticate. Save-AzureRmContext will write it out in json format
-    Save-AzureRmContext -Profile (Add-AzureRmAccount) -Path $env:TEMP\creds.json
+}
+catch {
+    Save-AzureRmContext -Profile (Add-AzureRmAccount) -Path $env:TEMP\creds.json -Force
     Import-AzureRmContext -Path $env:TEMP\creds.json   
 }
 
